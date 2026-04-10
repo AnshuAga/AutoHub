@@ -1,0 +1,21 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Server secrets
+server/.env
+server/.env.*
+!server/.env.example
+
+# Client secrets
+client/.env
+client/.env.*
+!client/.env.example
+
+# Node dependencies and logs
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

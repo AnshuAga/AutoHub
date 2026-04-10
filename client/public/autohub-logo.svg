@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 280" role="img" aria-labelledby="autohubLogoTitle autohubLogoDesc">
+  <title id="autohubLogoTitle">AutoHub logo</title>
+  <desc id="autohubLogoDesc">Stylized car outline above the word AUTOHUB.</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M40 176c54-40 126-72 206-74 82-2 150 15 203 46" stroke="#d90429" stroke-width="10"/>
+    <path d="M314 112c72-54 176-82 286-72 74 7 133 24 192 50" stroke="#020617" stroke-width="10"/>
+    <path d="M415 137c32 8 92 16 136 8 24-5 42-20 60-42" stroke="#020617" stroke-width="8"/>
+    <path d="M56 193c44 6 86 6 122 0 24-4 42 0 52 14" stroke="#020617" stroke-width="9"/>
+    <path d="M252 210c4-24 24-38 54-42 56-8 142-2 212 2 98 6 170-8 260-40 56-20 103-26 141-12 20 8 30 24 30 50" stroke="#d90429" stroke-width="10"/>
+    <path d="M390 212c-8 12-11 24-9 36 3 18 17 30 38 36" stroke="#020617" stroke-width="10"/>
+  </g>
+
+  <g transform="translate(430 150)">
+    <rect x="0" y="0" width="510" height="104" rx="18" fill="#ffffff" opacity="0.0"/>
+    <text x="0" y="88" font-size="102" font-family="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" font-weight="800" fill="#d90429" letter-spacing="1.6">AUTOHUB</text>
+  </g>
+</svg>
