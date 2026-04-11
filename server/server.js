@@ -10,6 +10,7 @@ const deliveryRoutes = require("./routes/deliveryRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
+const branchRoutes = require("./routes/branchRoutes");
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const requiredEnvVars = [
@@ -57,6 +58,7 @@ app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/services", serviceRoutes);
+app.use("/api/branches", branchRoutes);
 app.get("/", (req, res) => {
   res.send("AutoHub Backend Running");
 });

@@ -165,12 +165,17 @@ function Login() {
     <div className="auth-layout">
       <Navbar />
       <div className="auth-page">
-        <section className="auth-card card">
-          <div className="auth-intro">
-            <span className="eyebrow">Welcome Back</span>
-            <h1>Login to AutoHub</h1>
-            <p>Login with your credentials. Access your showroom dashboard, inventory workflows, booking pipeline, and payments.</p>
-          </div>
+        <div className="auth-page-shell">
+          <aside className="auth-side-visual card">
+            <img src="/gallery/login.png" alt="AutoHub login" className="auth-side-image" />
+          </aside>
+
+          <section className="auth-card card">
+            <div className="auth-intro">
+              <span className="eyebrow">Welcome Back</span>
+              <h1>Login to AutoHub</h1>
+              <p>Login with your credentials. Access your showroom dashboard, inventory workflows, booking pipeline, and payments.</p>
+            </div>
 
           <div className="auth-social-row">
             <button type="button" className="auth-social-btn auth-social-google" onClick={() => handleSocialSignIn("google")}>
@@ -265,13 +270,14 @@ function Login() {
             </button>
           </form>
 
-          <p className="auth-footnote">
-            New user? <Link to="/register">Create an account</Link>
-          </p>
-          <p className="auth-footnote" style={{ marginTop: "8px" }}>
-            Team member? <Link to="/team-login">Team Login</Link>
-          </p>
-        </section>
+            <p className="auth-footnote">
+              New user? <Link to="/register">Create an account</Link>
+            </p>
+            <p className="auth-footnote" style={{ marginTop: "8px" }}>
+              Team member? <Link to="/team-login">Team Login</Link>
+            </p>
+          </section>
+        </div>
       </div>
     </div>
   );

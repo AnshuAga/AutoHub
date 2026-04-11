@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/Sidebar";
 import Footer from "../../components/Footer";
 import { api } from "../../utils/api";
 
 function AddEmployee() {
+  const navigate = useNavigate();
   const loggedInUser = JSON.parse(localStorage.getItem("user") || "null");
   const loggedInRole = String(loggedInUser?.role || "").toLowerCase();
   const loggedInDesignation = String(loggedInUser?.designation || loggedInUser?.employeeRole || "").toLowerCase();
@@ -93,6 +95,7 @@ function AddEmployee() {
 
       const response = await api.post("/employees", payload);
       alert(response.data.message);
+      navigate("/employees");
 
       setFormData({
         name: "",

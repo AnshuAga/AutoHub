@@ -31,6 +31,7 @@ import ServiceBookings from "./pages/services/ServiceBookings";
 import AddServiceBooking from "./pages/services/AddServiceBooking";
 import EditServiceBooking from "./pages/services/EditServiceBooking";
 import ServiceCategories from "./pages/services/ServiceCategories";
+import BranchDetails from "./pages/branches/BranchDetails";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const Reports = lazy(() => import("./pages/reports/Reports"));
@@ -269,6 +270,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["admin", "manager"]}>
                 <ServiceCategories />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/branches"
+            element={
+              <ProtectedRoute>
+                <BranchDetails />
               </ProtectedRoute>
             }
           />

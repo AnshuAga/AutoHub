@@ -24,6 +24,7 @@ const getSidebarIcon = (route) => {
     "/profile": "\u{1F464}",
     "/feedback": "\u{1F4AC}",
     "/settings": "\u{2699}\u{FE0F}",
+    "/branches": "\u{1F3E2}",
   };
 
   return iconByRoute[route] || "\u{25B8}";
@@ -78,6 +79,7 @@ function Sidebar() {
       { to: "/deliveries", label: "My Deliveries" },
       { to: "/payments", label: "My Payments" },
       { to: "/profile", label: "Profile" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/feedback", label: "Feedback" },
       { to: "/settings", label: "Settings" },
     ],
@@ -88,6 +90,7 @@ function Sidebar() {
       { to: "/service-bookings", label: "Service Bookings" },
       { to: "/deliveries", label: "Deliveries" },
       { to: "/customers", label: "Customers" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/profile", label: "Profile" },
       { to: "/feedback", label: "Feedback" },
       { to: "/settings", label: "Settings" },
@@ -96,6 +99,7 @@ function Sidebar() {
       { to: "/dashboard", label: "Dashboard" },
       { to: "/vehicles", label: "Vehicles" },
       { to: "/service-bookings", label: "Service Bookings" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/profile", label: "Profile" },
       { to: "/feedback", label: "Feedback" },
       { to: "/settings", label: "Settings" },
@@ -103,6 +107,7 @@ function Sidebar() {
     deliveryMan: [
       { to: "/dashboard", label: "Dashboard" },
       { to: "/deliveries", label: "Deliveries" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/profile", label: "Profile" },
       { to: "/feedback", label: "Feedback" },
       { to: "/settings", label: "Settings" },
@@ -117,6 +122,7 @@ function Sidebar() {
       { to: "/customers", label: "Customers" },
       { to: "/payments", label: "Payments" },
       { to: "/employees", label: "Employees" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/reports", label: "Reports" },
       { to: "/profile", label: "Profile" },
       { to: "/feedback", label: "Feedback" },
@@ -132,6 +138,7 @@ function Sidebar() {
       { to: "/customers", label: "Customers" },
       { to: "/payments", label: "Payments" },
       { to: "/employees", label: "Employees" },
+      { to: "/branches", label: "Branch Details" },
       { to: "/reports", label: "Reports" },
       { to: "/profile", label: "Profile" },
       { to: "/feedback", label: "Feedback" },

@@ -134,12 +134,17 @@ function Register() {
     <div className="auth-layout">
       <Navbar />
       <div className="auth-page">
-        <section className="auth-card card">
-          <div className="auth-intro">
-            <span className="eyebrow">Get Started</span>
-            <h1>Create Your AutoHub Account</h1>
-            <p>Register once, then login with your credentials to manage inventory, bookings, payments, and customer journeys in one place.</p>
-          </div>
+        <div className="auth-page-shell">
+          <aside className="auth-side-visual card">
+            <img src="/gallery/register.png" alt="AutoHub register" className="auth-side-image" />
+          </aside>
+
+          <section className="auth-card card">
+            <div className="auth-intro">
+              <span className="eyebrow">Get Started</span>
+              <h1>Create Your AutoHub Account</h1>
+              <p>Register once, then login with your credentials to manage inventory, bookings, payments, and customer journeys in one place.</p>
+            </div>
 
           <div className="auth-social-row">
             <button type="button" className="auth-social-btn auth-social-google" onClick={() => handleSocialSignIn("google")}>
@@ -244,10 +249,11 @@ function Register() {
             </button>
           </form>
 
-          <p className="auth-footnote">
-            Already have an account? <Link to="/login">Login</Link>
-          </p>
-        </section>
+            <p className="auth-footnote">
+              Already have an account? <Link to="/login">Login</Link>
+            </p>
+          </section>
+        </div>
       </div>
     </div>
   );

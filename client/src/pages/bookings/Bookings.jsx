@@ -110,6 +110,8 @@ function Bookings() {
         ["Phone", booking.customerPhone || "-"],
         ["Vehicle", booking.vehicleName || "-"],
         ["Vehicle Type", booking.vehicleType || booking.vehicleCategory || "-"],
+        ["Variant", booking.vehicleVariant || "-"],
+        ["Color", booking.vehicleColor || "-"],
         ["Branch", booking.branch || "Main Branch"],
         ["Booking Date", booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : "-"],
         ["Status", booking.status || "-"],
@@ -180,7 +182,12 @@ function Bookings() {
       <tr key={booking._id}>
         <td>{booking.bookingNo || booking._id?.slice(-6) || "-"}</td>
         <td>{isCustomer ? booking.vehicleName : booking.customerName}</td>
-        <td>{(booking.vehicleCategory || booking.vehicleType || "-").toString()}</td>
+        <td>
+          {(booking.vehicleCategory || booking.vehicleType || "-").toString()}
+          {(booking.vehicleVariant || booking.vehicleColor)
+            ? ` (${booking.vehicleVariant || "-"} / ${booking.vehicleColor || "-"})`
+            : ""}
+        </td>
         <td>{new Date(booking.bookingDate).toLocaleDateString()}</td>
         <td>{booking.status}</td>
         <td>{booking.paymentStatus || "Unpaid"}</td>

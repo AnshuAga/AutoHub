@@ -1,14 +1,26 @@
 const mongoose = require("mongoose");
 
-const vehicleSchema = new mongoose.Schema(
+const variantStockSchema = new mongoose.Schema(
   {
-    vehicleName: {
+    variant: {
       type: String,
       required: true,
       trim: true,
     },
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  {
+    _id: false,
+  }
+);
 
-    type: {
+const vehicleSchema = new mongoose.Schema(
+  {
+    vehicleName: {
       type: String,
       required: true,
       trim: true,
@@ -31,6 +43,33 @@ const vehicleSchema = new mongoose.Schema(
       default: null,
     },
 
+    modelColor: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    variant: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    variantOptions: {
+      type: [String],
+      default: [],
+    },
+
+    variantStocks: {
+      type: [variantStockSchema],
+      default: [],
+    },
+
+    colorOptions: {
+      type: [String],
+      default: [],
+    },
+
     showroomBranch: {
       type: String,
       default: "Main Branch",
@@ -40,6 +79,12 @@ const vehicleSchema = new mongoose.Schema(
     stock: {
       type: Number,
       default: 1,
+    },
+
+    incomingStock: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     status: {
@@ -68,6 +113,11 @@ const vehicleSchema = new mongoose.Schema(
       type: String,
       default: "",
       trim: true,
+    },
+
+    vehicleImages: {
+      type: [String],
+      default: [],
     },
 
     assignedTo: {

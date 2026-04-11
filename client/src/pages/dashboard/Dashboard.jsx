@@ -23,6 +23,10 @@ function Dashboard() {
   const isMechanic = staffRole === "mechanic";
   const isDeliveryMan = staffRole === "delivery man";
   const showRevenue = isCustomer || isAdmin || normalizedRole === "manager";
+  const isCompletedPayment = (payment) => {
+    const normalizedStatus = String(payment?.status || "").toLowerCase().trim();
+    return normalizedStatus === "completed" || normalizedStatus === "paid";
+  };
   const [stats, setStats] = useState({
   vehicles: 0,
   customers: 0,
@@ -110,7 +114,7 @@ function Dashboard() {
     const employees = toList(employeesResult);
 
     const totalRevenue = payments.reduce((sum, payment) => {
-      if (payment.status === "Completed") {
+      if (isCompletedPayment(payment)) {
         return sum + Number(payment.amount || 0);
       }
       return sum;
@@ -151,6 +155,30 @@ function Dashboard() {
 
 useEffect(() => {
   fetchStats();
+}, []);
+
+useEffect(() => {
+  const refreshStats = () => {
+    fetchStats();
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      refreshStats();
+    }
+  };
+
+  window.addEventListener("focus", refreshStats);
+  window.addEventListener("autohub:payments-updated", refreshStats);
+  window.addEventListener("storage", refreshStats);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    window.removeEventListener("focus", refreshStats);
+    window.removeEventListener("autohub:payments-updated", refreshStats);
+    window.removeEventListener("storage", refreshStats);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
 }, []);
 
   return (

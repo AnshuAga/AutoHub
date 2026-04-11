@@ -77,6 +77,18 @@ const bookingSchema = new mongoose.Schema(
       trim: true,
     },
 
+    vehicleVariant: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    vehicleColor: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     branch: {
       type: String,
       default: "Main Branch",

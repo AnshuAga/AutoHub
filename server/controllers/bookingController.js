@@ -14,6 +14,20 @@ const isTeamScopedRole = (req) => TEAM_SCOPED_ROLES.includes(getUserRole(req));
 const getRequiredUserBranch = (req) => String(req?.user?.branch || "").trim();
 const normalizeEnvValue = (value) => (typeof value === "string" ? value.trim() : value);
 
+const findVariantStockIndex = (variantStocks = [], variantName = "") => {
+  const target = String(variantName || "").trim().toLowerCase();
+  if (!target) {
+    return -1;
+  }
+
+  return variantStocks.findIndex(
+    (entry) => String(entry?.variant || "").trim().toLowerCase() === target
+  );
+};
+
+const getTotalVariantStock = (variantStocks = []) =>
+  variantStocks.reduce((total, entry) => total + Number(entry?.stock || 0), 0);
+
 const getEmailTransporter = () => {
   const SMTP_HOST = normalizeEnvValue(process.env.SMTP_HOST);
   const SMTP_PORT = normalizeEnvValue(process.env.SMTP_PORT);
@@ -144,7 +158,17 @@ const restoreVehicleAvailabilityForBooking = async (booking) => {
     return;
   }
 
-  vehicle.stock = Number(vehicle.stock || 0) + 1;
+  const variantStocks = Array.isArray(vehicle.variantStocks) ? vehicle.variantStocks : [];
+  const selectedVariantIndex = findVariantStockIndex(variantStocks, booking.vehicleVariant);
+
+  if (selectedVariantIndex >= 0) {
+    variantStocks[selectedVariantIndex].stock = Number(variantStocks[selectedVariantIndex].stock || 0) + 1;
+    vehicle.variantStocks = variantStocks;
+    vehicle.stock = getTotalVariantStock(variantStocks);
+  } else {
+    vehicle.stock = Number(vehicle.stock || 0) + 1;
+  }
+
   if (vehicle.stock > 0) {
     vehicle.status = "Available";
   }
@@ -240,6 +264,8 @@ const addBooking = async (req, res) => {
       vehicleName,
       vehicleType,
       vehicleCategory,
+      vehicleVariant,
+      vehicleColor,
       branch,
       bookingDate,
       status,
@@ -297,6 +323,25 @@ const addBooking = async (req, res) => {
       return res.status(400).json({ message: "Vehicle is out of stock" });
     }
 
+    if (shouldReserveStock && linkedVehicle) {
+      const variantStocks = Array.isArray(linkedVehicle.variantStocks) ? linkedVehicle.variantStocks : [];
+
+      if (variantStocks.length > 0) {
+        if (!vehicleVariant) {
+          return res.status(400).json({ message: "Please select a vehicle variant" });
+        }
+
+        const selectedVariantIndex = findVariantStockIndex(variantStocks, vehicleVariant);
+        if (selectedVariantIndex < 0) {
+          return res.status(400).json({ message: "Selected variant is invalid" });
+        }
+
+        if (Number(variantStocks[selectedVariantIndex].stock || 0) <= 0) {
+          return res.status(400).json({ message: "Selected variant is out of stock" });
+        }
+      }
+    }
+
     if (customerEmail || customerPhone) {
       const customerQuery = customerEmail
         ? { email: customerEmail.toLowerCase() }
@@ -344,6 +389,8 @@ const addBooking = async (req, res) => {
       vehicleName,
       vehicleType,
       vehicleCategory,
+      vehicleVariant,
+      vehicleColor,
       branch: scopedBranch,
       bookingDate,
       status,
@@ -355,7 +402,20 @@ const addBooking = async (req, res) => {
     });
 
     if (shouldReserveStock && linkedVehicle) {
-      linkedVehicle.stock = Math.max(0, Number(linkedVehicle.stock || 0) - 1);
+      const variantStocks = Array.isArray(linkedVehicle.variantStocks) ? linkedVehicle.variantStocks : [];
+      const selectedVariantIndex = findVariantStockIndex(variantStocks, vehicleVariant);
+
+      if (variantStocks.length > 0 && selectedVariantIndex >= 0) {
+        variantStocks[selectedVariantIndex].stock = Math.max(
+          0,
+          Number(variantStocks[selectedVariantIndex].stock || 0) - 1
+        );
+        linkedVehicle.variantStocks = variantStocks;
+        linkedVehicle.stock = getTotalVariantStock(variantStocks);
+      } else {
+        linkedVehicle.stock = Math.max(0, Number(linkedVehicle.stock || 0) - 1);
+      }
+
       linkedVehicle.status = linkedVehicle.stock > 0 ? "Available" : "Booked";
       await linkedVehicle.save();
     }

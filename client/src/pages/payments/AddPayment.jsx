@@ -125,6 +125,9 @@ function AddPayment() {
 
       alert(`${response.data.message}. Transaction ID: ${response.data.payment?.transactionId || transactionId}`);
 
+      localStorage.setItem("autohub:payments-updated", String(Date.now()));
+      window.dispatchEvent(new Event("autohub:payments-updated"));
+
       setFormData({
         bookingId: "",
         bookingNo: "",

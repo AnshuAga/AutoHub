@@ -192,7 +192,7 @@ function EmployeeLogin() {
               </>
             )}
 
-            <button type="submit" className="primary-btn auth-submit-btn">
+            <button type="submit" className="primary-btn auth-submit-btn auth-submit-btn-team">
               {authMode === "password" ? "Login to Team Portal" : "Verify OTP & Login"}
             </button>
           </form>
