@@ -3,6 +3,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const { buildEmployeeCredentialsTemplate } = require("../utils/emailTemplates");
 
 const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
@@ -127,25 +128,20 @@ const getEmailTransporter = () => {
 const sendEmployeeCredentialsEmail = async ({ to, name, password, designation, branch }) => {
   const transporter = getEmailTransporter();
   const from = normalizeEnvValue(process.env.SMTP_FROM) || normalizeEnvValue(process.env.SMTP_USER);
+  const { subject, html, text } = buildEmployeeCredentialsTemplate({
+    name,
+    email: to,
+    password,
+    designation,
+    branch,
+  });
 
   await transporter.sendMail({
     from,
     to,
-    subject: "AutoHub Employee Login Credentials",
-    text: [
-      `Hello ${name || "Team Member"},`,
-      "",
-      "Your AutoHub employee account has been created.",
-      `Designation: ${designation}`,
-      `Branch: ${branch}`,
-      `Login Email: ${to}`,
-      `Temporary Password: ${password}`,
-      "",
-      "Please login and change your password from profile/settings after first login.",
-      "",
-      "Regards,",
-      "AutoHub Admin",
-    ].join("\n"),
+    subject,
+    text,
+    html,
   });
 };
 

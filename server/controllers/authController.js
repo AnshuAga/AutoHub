@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const { isValidPhoneNumber, normalizePhone } = require("../utils/phone");
+const { buildOtpEmailTemplate } = require("../utils/emailTemplates");
 
 const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 10);
 const TEAM_ACCOUNT_ROLES = ["admin", "manager", "employee"];
@@ -77,17 +78,19 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 const sendOtpEmail = async ({ to, otp, purpose }) => {
   const transporter = getEmailTransporter();
   const from = normalizeEnvValue(process.env.SMTP_FROM) || normalizeEnvValue(process.env.SMTP_USER);
-  const subject = purpose === "register" ? "AutoHub Email Verification OTP" : "AutoHub Login OTP";
-  const message =
-    purpose === "register"
-      ? `Your AutoHub verification OTP is ${otp}. It is valid for ${OTP_EXPIRY_MINUTES} minutes.`
-      : `Your AutoHub login OTP is ${otp}. It is valid for ${OTP_EXPIRY_MINUTES} minutes.`;
+  const { subject, html, text } = buildOtpEmailTemplate({
+    name: "",
+    otp,
+    purpose,
+    expiryMinutes: OTP_EXPIRY_MINUTES,
+  });
 
   await transporter.sendMail({
     from,
     to,
     subject,
-    text: message,
+    text,
+    html,
   });
 };
 

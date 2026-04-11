@@ -2,7 +2,9 @@ const Employee = require("../models/Employee");
 const ServiceBooking = require("../models/ServiceBooking");
 const ServiceCategory = require("../models/ServiceCategory");
 const Payment = require("../models/Payment");
+const nodemailer = require("nodemailer");
 const { isValidPhoneNumber, normalizePhone } = require("../utils/phone");
+const { buildServiceBookingConfirmationTemplate } = require("../utils/emailTemplates");
 
 const DEFAULT_SERVICE_TYPES = [
   { name: "Oil Change", price: 500 },
@@ -46,6 +48,58 @@ const isAdminOrManager = (req) => {
 const isEmployee = (req) => getUserRole(req) === "employee";
 const isStaffRole = (req) => ["admin", "manager", "employee"].includes(getUserRole(req));
 const isCustomer = (req) => getUserRole(req) === "customer";
+const normalizeEnvValue = (value) => (typeof value === "string" ? value.trim() : value);
+
+const getEmailTransporter = () => {
+  const SMTP_HOST = normalizeEnvValue(process.env.SMTP_HOST);
+  const SMTP_PORT = normalizeEnvValue(process.env.SMTP_PORT);
+  const SMTP_USER = normalizeEnvValue(process.env.SMTP_USER);
+  const SMTP_PASS = normalizeEnvValue(process.env.SMTP_PASS);
+
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    throw new Error("SMTP credentials are not configured on the server");
+  }
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: Number(SMTP_PORT) === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+};
+
+const sendServiceBookingConfirmationEmail = async ({ to, booking }) => {
+  if (!to) {
+    return;
+  }
+
+  const transporter = getEmailTransporter();
+  const from = normalizeEnvValue(process.env.SMTP_FROM) || normalizeEnvValue(process.env.SMTP_USER);
+  const { subject, html, text } = buildServiceBookingConfirmationTemplate({
+    name: booking.customerName,
+    email: to,
+    serviceNo: booking.serviceNo,
+    vehicleName: booking.vehicleName,
+    vehicleNumber: booking.vehicleNumber,
+    scheduledDate: booking.scheduledDate,
+    scheduledTime: booking.scheduledTime,
+    branch: booking.branch,
+    selectedServices: booking.selectedServices,
+    estimatedCost: booking.estimatedCost,
+    paymentStatus: booking.paymentStatus,
+  });
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  });
+};
 
 const validateAssignableMechanic = async (req, mechanicId) => {
   const normalizedMechanicId = String(mechanicId || "").trim();
@@ -516,6 +570,18 @@ const addServiceBooking = async (req, res) => {
       transactionId,
       invoiceNo: normalizedStatus === "Completed" ? await generateInvoiceNo() : "",
     });
+
+    const customerEmailForNotification = String(customerEmail || req.user?.email || "").trim();
+    if (customerEmailForNotification) {
+      try {
+        await sendServiceBookingConfirmationEmail({
+          to: customerEmailForNotification,
+          booking,
+        });
+      } catch (emailError) {
+        console.error("Service booking confirmation email failed:", emailError);
+      }
+    }
 
     res.status(201).json({ message: "Service booking created", booking });
   } catch (error) {

@@ -2,7 +2,9 @@ const Booking = require("../models/Booking");
 const Customer = require("../models/Customer");
 const Payment = require("../models/Payment");
 const Vehicle = require("../models/Vehicle");
+const nodemailer = require("nodemailer");
 const { isValidPhoneNumber, normalizePhone } = require("../utils/phone");
+const { buildBookingConfirmationTemplate } = require("../utils/emailTemplates");
 
 const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TEAM_SCOPED_ROLES = ["manager", "employee"];
@@ -10,6 +12,56 @@ const TEAM_SCOPED_ROLES = ["manager", "employee"];
 const getUserRole = (req) => String(req?.user?.role || "").toLowerCase();
 const isTeamScopedRole = (req) => TEAM_SCOPED_ROLES.includes(getUserRole(req));
 const getRequiredUserBranch = (req) => String(req?.user?.branch || "").trim();
+const normalizeEnvValue = (value) => (typeof value === "string" ? value.trim() : value);
+
+const getEmailTransporter = () => {
+  const SMTP_HOST = normalizeEnvValue(process.env.SMTP_HOST);
+  const SMTP_PORT = normalizeEnvValue(process.env.SMTP_PORT);
+  const SMTP_USER = normalizeEnvValue(process.env.SMTP_USER);
+  const SMTP_PASS = normalizeEnvValue(process.env.SMTP_PASS);
+
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    throw new Error("SMTP credentials are not configured on the server");
+  }
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: Number(SMTP_PORT) === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+};
+
+const sendBookingConfirmationEmail = async ({ to, booking }) => {
+  if (!to) {
+    return;
+  }
+
+  const transporter = getEmailTransporter();
+  const from = normalizeEnvValue(process.env.SMTP_FROM) || normalizeEnvValue(process.env.SMTP_USER);
+  const { subject, html, text } = buildBookingConfirmationTemplate({
+    name: booking.customerName,
+    email: to,
+    bookingNo: booking.bookingNo,
+    vehicleName: booking.vehicleName,
+    vehicleType: booking.vehicleType,
+    bookingDate: booking.bookingDate,
+    branch: booking.branch,
+    paymentStatus: booking.paymentStatus,
+    amount: booking.amount,
+  });
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  });
+};
 
 const applyBookingBranchScope = (req, filters) => {
   if (!isTeamScopedRole(req)) {
@@ -318,6 +370,18 @@ const addBooking = async (req, res) => {
       booking,
       payment,
     });
+
+    const customerEmailForNotification = String(customerEmail || req.user?.email || "").trim();
+    if (customerEmailForNotification) {
+      try {
+        await sendBookingConfirmationEmail({
+          to: customerEmailForNotification,
+          booking,
+        });
+      } catch (emailError) {
+        console.error("Booking confirmation email failed:", emailError);
+      }
+    }
   } catch (error) {
     res.status(500).json({
       message: error.message,
