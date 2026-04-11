@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const path = require("path");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
@@ -9,7 +10,7 @@ const deliveryRoutes = require("./routes/deliveryRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const requiredEnvVars = [
   "MONGO_URI",
