@@ -11,7 +11,14 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 dotenv.config();
 
-const requiredEnvVars = ["MONGO_URI", "JWT_SECRET", "SMTP_PASS"];
+const requiredEnvVars = [
+  "MONGO_URI",
+  "JWT_SECRET",
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_USER",
+  "SMTP_PASS",
+];
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
 
 if (missingEnvVars.length > 0) {

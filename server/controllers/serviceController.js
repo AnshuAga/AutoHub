@@ -55,18 +55,29 @@ const getEmailTransporter = () => {
   const SMTP_PORT = normalizeEnvValue(process.env.SMTP_PORT);
   const SMTP_USER = normalizeEnvValue(process.env.SMTP_USER);
   const SMTP_PASS = normalizeEnvValue(process.env.SMTP_PASS);
+  const SMTP_PASS_SANITIZED =
+    typeof SMTP_PASS === "string" ? SMTP_PASS.replace(/\s+/g, "") : SMTP_PASS;
+  const SMTP_SECURE =
+    String(process.env.SMTP_SECURE || (Number(SMTP_PORT) === 465 ? "true" : "false")).toLowerCase() === "true";
+  const SMTP_REQUIRE_TLS =
+    String(process.env.SMTP_REQUIRE_TLS || (Number(SMTP_PORT) === 587 ? "true" : "false")).toLowerCase() ===
+    "true";
 
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS_SANITIZED) {
     throw new Error("SMTP credentials are not configured on the server");
   }
 
   return nodemailer.createTransport({
     host: SMTP_HOST,
     port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
+    secure: SMTP_SECURE,
+    requireTLS: SMTP_REQUIRE_TLS,
     auth: {
       user: SMTP_USER,
-      pass: SMTP_PASS,
+      pass: SMTP_PASS_SANITIZED,
+    },
+    tls: {
+      minVersion: "TLSv1.2",
     },
   });
 };
@@ -571,6 +582,7 @@ const addServiceBooking = async (req, res) => {
       invoiceNo: normalizedStatus === "Completed" ? await generateInvoiceNo() : "",
     });
 
+    let emailWarning = "";
     const customerEmailForNotification = String(customerEmail || req.user?.email || "").trim();
     if (customerEmailForNotification) {
       try {
@@ -580,10 +592,16 @@ const addServiceBooking = async (req, res) => {
         });
       } catch (emailError) {
         console.error("Service booking confirmation email failed:", emailError);
+        emailWarning = "Service booking created, but confirmation email could not be sent.";
       }
     }
 
-    res.status(201).json({ message: "Service booking created", booking });
+    const responsePayload = { message: "Service booking created", booking };
+    if (emailWarning) {
+      responsePayload.warning = emailWarning;
+    }
+
+    res.status(201).json(responsePayload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
