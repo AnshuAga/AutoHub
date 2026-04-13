@@ -14,6 +14,8 @@ const {
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   googleAuthStart,
   googleAuthCallback,
   facebookAuthStart,
@@ -28,6 +30,8 @@ router.post("/login-with-otp", loginWithOtp);
 router.post("/team/login", teamLoginUser);
 router.post("/team/send-login-otp", teamSendLoginOtp);
 router.post("/team/login-with-otp", teamLoginWithOtp);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);
 router.put("/change-password", protect, changePassword);

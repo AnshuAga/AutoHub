@@ -132,6 +132,39 @@ const buildOtpEmailTemplate = ({ name, otp, purpose, expiryMinutes }) => {
   return { subject, html, text };
 };
 
+const buildResetPasswordEmailTemplate = ({ name, resetUrl, expiryMinutes }) => {
+  const html = buildBrandedEmail({
+    title: "Reset Your Password",
+    preheader: "AutoHub password reset request",
+    greeting: name ? `Hello ${name},` : "Hello,",
+    intro:
+      "We received a request to reset your AutoHub password. Click the button below to create a new password.",
+    details: [
+      { label: "Valid for", value: `${expiryMinutes} minutes` },
+      { label: "Requested action", value: "Password reset" },
+    ],
+    buttonLabel: "Reset Password",
+    buttonUrl: resetUrl,
+    note: "If you did not request a password reset, you can safely ignore this email.",
+  });
+
+  const text = [
+    `Hello ${name || "there"},`,
+    "",
+    "We received a request to reset your AutoHub password.",
+    `Reset link: ${resetUrl}`,
+    `Valid for: ${expiryMinutes} minutes`,
+    "",
+    "If you did not request a password reset, you can safely ignore this email.",
+  ].join("\n");
+
+  return {
+    subject: "AutoHub Password Reset",
+    html,
+    text,
+  };
+};
+
 const buildEmployeeCredentialsTemplate = ({ name, email, password, designation, branch }) => {
   const html = buildBrandedEmail({
     title: "Employee Account Created",
@@ -325,6 +358,7 @@ const buildServiceBookingConfirmationTemplate = ({
 
 module.exports = {
   buildOtpEmailTemplate,
+  buildResetPasswordEmailTemplate,
   buildEmployeeCredentialsTemplate,
   buildBookingConfirmationTemplate,
   buildServiceBookingConfirmationTemplate,

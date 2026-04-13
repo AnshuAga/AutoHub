@@ -5,9 +5,10 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const { isValidPhoneNumber, normalizePhone } = require("../utils/phone");
-const { buildOtpEmailTemplate } = require("../utils/emailTemplates");
+const { buildOtpEmailTemplate, buildResetPasswordEmailTemplate } = require("../utils/emailTemplates");
 
 const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 10);
+const RESET_PASSWORD_EXPIRY_MINUTES = Number(process.env.RESET_PASSWORD_EXPIRY_MINUTES || 30);
 const TEAM_ACCOUNT_ROLES = ["admin", "manager", "employee"];
 const TEAM_ENRICH_ROLES = ["employee", "manager"];
 
@@ -94,6 +95,39 @@ const sendOtpEmail = async ({ to, otp, purpose }) => {
     otp,
     purpose,
     expiryMinutes: OTP_EXPIRY_MINUTES,
+  });
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  });
+};
+
+const resolveClientBaseUrl = () => {
+  const preferredUrl = normalizeEnvValue(process.env.CLIENT_PASSWORD_RESET_URL);
+  if (preferredUrl) {
+    return preferredUrl.replace(/\/$/, "");
+  }
+
+  const fallbackUrl = normalizeEnvValue(process.env.CLIENT_URL) || "http://localhost:5173";
+  return fallbackUrl.replace(/\/$/, "");
+};
+
+const buildPasswordResetLink = (resetToken) => {
+  const clientBaseUrl = resolveClientBaseUrl();
+  return `${clientBaseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+};
+
+const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
+  const transporter = getEmailTransporter();
+  const from = normalizeEnvValue(process.env.SMTP_FROM) || normalizeEnvValue(process.env.SMTP_USER);
+  const { subject, html, text } = buildResetPasswordEmailTemplate({
+    name,
+    resetUrl,
+    expiryMinutes: RESET_PASSWORD_EXPIRY_MINUTES,
   });
 
   await transporter.sendMail({
@@ -217,6 +251,84 @@ const changePassword = async (req, res) => {
     res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user || !user.isRegistrationCompleted || !user.isEmailVerified) {
+      return res.status(200).json({
+        message: "If an account exists with this email, a reset link has been sent.",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedResetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashedResetToken;
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_PASSWORD_EXPIRY_MINUTES * 60 * 1000);
+    await user.save();
+
+    const resetUrl = buildPasswordResetLink(resetToken);
+    await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl,
+    });
+
+    return res.status(200).json({
+      message: "If an account exists with this email, a reset link has been sent.",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({ message: "token, password and confirmPassword are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Password and confirm password do not match" });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Reset token is invalid or expired" });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = "";
+    user.resetPasswordExpiresAt = null;
+    user.loginOtp = "";
+    user.loginOtpExpiresAt = null;
+    await user.save();
+
+    return res.status(200).json({ message: "Password reset successful. Please login with your new password." });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -822,6 +934,8 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   googleAuthStart,
   googleAuthCallback,
   facebookAuthStart,

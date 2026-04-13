@@ -241,6 +241,11 @@ function Login() {
                   value={formData.password}
                   onChange={handleChange}
                 />
+                <div className="auth-inline-link-wrap">
+                  <Link className="auth-inline-link" to="/forgot-password">
+                    Forgot password?
+                  </Link>
+                </div>
               </div>
             ) : (
               <>

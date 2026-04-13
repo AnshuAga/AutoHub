@@ -4,6 +4,8 @@ import Home from "./pages/Home";
 import Login from "./pages/auth/login";
 import EmployeeLogin from "./pages/auth/EmployeeLogin";
 import Register from "./pages/auth/register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import OAuthSuccess from "./pages/auth/OAuthSuccess";
 import Dashboard from "./pages/dashboard/Dashboard";
 import Vehicles from "./pages/vehicles/Vehicles";
@@ -52,6 +54,8 @@ function App() {
         <Route path="/team-login" element={<EmployeeLogin />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/oauth/success" element={<OAuthSuccess />} />
         <Route path="/oauth/success/*" element={<OAuthSuccess />} />
         <Route
