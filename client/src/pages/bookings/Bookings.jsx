@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/Sidebar";
 import Footer from "../../components/Footer";
 import { api } from "../../utils/api";
+import { startRazorpayCheckout } from "../../utils/razorpay";
 
 function Bookings() {
-  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user"));
   const isCustomer = (user?.role || "").toLowerCase() === "customer";
 
@@ -31,23 +30,25 @@ function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
- const [loading, setLoading] = useState(true);
- const fetchBookings = async () => {
-  try {
-    const response = await api.get("/bookings", {
-      params: {
-        q: searchTerm,
-        status,
-        ...(isCustomer && user?.email ? { customerEmail: user.email } : {}),
-      },
-    });
-    setBookings(response.data);
-  } catch (error) {
-    console.log(error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const [loading, setLoading] = useState(true);
+  const [processingPaymentId, setProcessingPaymentId] = useState("");
+
+  const fetchBookings = async () => {
+    try {
+      const response = await api.get("/bookings", {
+        params: {
+          q: searchTerm,
+          status,
+          ...(isCustomer && user?.email ? { customerEmail: user.email } : {}),
+        },
+      });
+      setBookings(response.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchBookings();
@@ -68,21 +69,38 @@ function Bookings() {
     }
   };
 
-  const handleProceedToPay = (booking) => {
-    localStorage.setItem(
-      "selectedPaymentBooking",
-      JSON.stringify({
-        bookingId: booking._id,
-        bookingNo: booking.bookingNo || "",
+  const handleProceedToPay = async (booking) => {
+    const amount = Number(booking.amount || 0);
+    if (!amount || amount <= 0) {
+      alert("Booking amount is missing. Please update booking amount before payment.");
+      return;
+    }
+
+    try {
+      setProcessingPaymentId(booking._id);
+      const response = await startRazorpayCheckout({
+        endpointBase: "/payments",
+        amount,
         customerName: booking.customerName,
         customerEmail: booking.customerEmail,
-        vehicleName: booking.vehicleName,
-        amount: booking.amount || "",
+        bookingId: booking._id,
+        bookingNo: booking.bookingNo || "",
         branch: booking.branch || "Main Branch",
-      })
-    );
+        method: "Online",
+        paymentType: "booking",
+        customerPhone: booking.customerPhone || "",
+        description: "AutoHub vehicle booking payment",
+      });
 
-    navigate("/add-payment");
+      alert(`${response.message || "Payment completed"}. Transaction ID: ${response.payment?.transactionId || ""}`);
+      localStorage.setItem("autohub:payments-updated", String(Date.now()));
+      window.dispatchEvent(new Event("autohub:payments-updated"));
+      fetchBookings();
+    } catch (error) {
+      alert(error.response?.data?.message || error.message || "Payment failed");
+    } finally {
+      setProcessingPaymentId("");
+    }
   };
 
   const handleDownloadInvoice = async (booking) => {
@@ -195,8 +213,12 @@ function Bookings() {
         <td>
           <div style={{ display: "flex", gap: "10px" }}>
             {isCustomer && booking.paymentStatus !== "Paid" ? (
-              <button className="success-btn small-btn" onClick={() => handleProceedToPay(booking)}>
-                Proceed to Pay
+              <button
+                className="success-btn small-btn"
+                onClick={() => handleProceedToPay(booking)}
+                disabled={processingPaymentId === booking._id}
+              >
+                {processingPaymentId === booking._id ? "Processing..." : "Proceed to Pay"}
               </button>
             ) : null}
             {String(booking.paymentStatus || "").toLowerCase() === "paid" ? (

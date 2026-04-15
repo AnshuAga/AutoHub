@@ -5,6 +5,7 @@ const Payment = require("../models/Payment");
 const nodemailer = require("nodemailer");
 const { isValidPhoneNumber, normalizePhone } = require("../utils/phone");
 const { buildServiceBookingConfirmationTemplate } = require("../utils/emailTemplates");
+const { createRazorpayOrder, verifyRazorpaySignature } = require("../utils/razorpayGateway");
 
 const DEFAULT_SERVICE_TYPES = [
   { name: "Oil Change", price: 500 },
@@ -319,6 +320,164 @@ const getAssignedEmployeeFilter = async (req) => {
 };
 
 const generatePaymentTransactionId = () => `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+const resolveServicePaymentContext = async ({ bookingId, bookingNo, customerName, customerEmail, amount, branch }) => {
+  let resolvedBookingNo = String(bookingNo || "").trim();
+  let resolvedCustomerName = String(customerName || "").trim();
+  let resolvedCustomerEmail = String(customerEmail || "").trim();
+  let resolvedAmount = Number(amount);
+  let resolvedBranch = String(branch || "").trim();
+
+  if (bookingId) {
+    const booking = await ServiceBooking.findById(bookingId);
+    if (booking) {
+      resolvedBookingNo = resolvedBookingNo || booking.serviceNo || "";
+      resolvedCustomerName = resolvedCustomerName || booking.customerName || "";
+      resolvedCustomerEmail = resolvedCustomerEmail || booking.customerEmail || "";
+      resolvedAmount = Number.isFinite(resolvedAmount) && resolvedAmount > 0 ? resolvedAmount : Number(booking.actualCost || booking.estimatedCost || 0);
+      resolvedBranch = resolvedBranch || booking.branch || "Main Branch";
+    }
+  }
+
+  return {
+    bookingNo: resolvedBookingNo,
+    customerName: resolvedCustomerName,
+    customerEmail: resolvedCustomerEmail,
+    amount: resolvedAmount,
+    branch: resolvedBranch || "Main Branch",
+  };
+};
+
+const createServiceRazorpayOrder = async (req, res) => {
+  try {
+    const {
+      bookingId,
+      bookingNo,
+      customerName,
+      customerEmail,
+      amount,
+      branch,
+      method = "Online",
+    } = req.body;
+
+    const paymentContext = await resolveServicePaymentContext({
+      bookingId,
+      bookingNo,
+      customerName,
+      customerEmail,
+      amount,
+      branch,
+    });
+
+    if (!paymentContext.customerName || !paymentContext.amount || paymentContext.amount <= 0) {
+      return res.status(400).json({ message: "customerName and amount are required" });
+    }
+
+    const receipt = `service-${paymentContext.bookingNo || bookingId || Date.now()}`;
+    const result = await createRazorpayOrder({
+      amount: paymentContext.amount,
+      receipt,
+      notes: {
+        bookingId: bookingId || "",
+        bookingNo: paymentContext.bookingNo || "",
+        customerName: paymentContext.customerName,
+        customerEmail: paymentContext.customerEmail || "",
+        branch: paymentContext.branch,
+        method,
+        paymentType: "service-booking",
+      },
+    });
+
+    res.status(200).json({
+      message: "Razorpay order created",
+      keyId: result.keyId,
+      order: result.order,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+};
+
+const verifyServiceRazorpayPayment = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      bookingId,
+      bookingNo,
+      customerName,
+      customerEmail,
+      amount,
+      method = "Online",
+      branch,
+    } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ message: "Missing Razorpay payment details" });
+    }
+
+    if (!verifyRazorpaySignature({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+    })) {
+      return res.status(400).json({ message: "Invalid Razorpay signature" });
+    }
+
+    const paymentContext = await resolveServicePaymentContext({
+      bookingId,
+      bookingNo,
+      customerName,
+      customerEmail,
+      amount,
+      branch,
+    });
+
+    if (isTeamScopedRole(req)) {
+      const userBranch = getRequiredUserBranch(req);
+      if (!userBranch) {
+        return res.status(403).json({ message: "Your account is missing branch mapping" });
+      }
+      paymentContext.branch = userBranch;
+    }
+
+    if (!paymentContext.customerName || !paymentContext.amount || paymentContext.amount <= 0) {
+      return res.status(400).json({ message: "Unable to resolve payment details" });
+    }
+
+    const booking = await ServiceBooking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Service booking not found" });
+    }
+
+    if (getUserRole(req) === "customer" && String(booking.customerEmail || "").toLowerCase() !== String(paymentContext.customerEmail || "").toLowerCase()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const updatedBooking = await ServiceBooking.findByIdAndUpdate(
+      bookingId,
+      {
+        paymentStatus: "Paid",
+        paymentMethod: method,
+        transactionId: razorpay_payment_id,
+      },
+      { new: true, runValidators: true }
+    );
+
+    await syncServicePaymentRecord({
+      beforeBooking: booking,
+      afterBooking: updatedBooking,
+    });
+
+    res.status(200).json({
+      message: "Payment verified successfully",
+      booking: updatedBooking,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+};
 
 const syncServicePaymentRecord = async ({ beforeBooking, afterBooking }) => {
   const beforePaid = String(beforeBooking?.paymentStatus || "").toLowerCase() === "paid";
@@ -923,6 +1082,8 @@ module.exports = {
   updateServiceCategory,
   deleteServiceCategory,
   getServiceMechanics,
+  createServiceRazorpayOrder,
+  verifyServiceRazorpayPayment,
   addServiceBooking,
   getServiceBookings,
   getServiceBookingById,

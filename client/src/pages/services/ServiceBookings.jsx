@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/Sidebar";
 import Footer from "../../components/Footer";
 import { api } from "../../utils/api";
+import { startRazorpayCheckout } from "../../utils/razorpay";
 
 const STATUS_OPTIONS = ["Pending", "Confirmed", "In Service", "Completed", "Cancelled"];
 
 function ServiceBookings() {
-  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = String(user?.role || "").toLowerCase().trim();
   const rawDesignation = String(user?.designation || "").toLowerCase().trim();
@@ -59,19 +59,9 @@ function ServiceBookings() {
   const [assignmentMechanicId, setAssignmentMechanicId] = useState("");
   const [assignmentError, setAssignmentError] = useState("");
   const [assigningBookingId, setAssigningBookingId] = useState("");
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [paymentTarget, setPaymentTarget] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [paymentError, setPaymentError] = useState("");
-  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [processingPaymentId, setProcessingPaymentId] = useState("");
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState("");
-  const [paymentForm, setPaymentForm] = useState({
-    upiId: "",
-    cardNumber: "",
-    cardExpiry: "",
-    cardCvv: "",
-    cardHolderName: "",
-  });
 
   useEffect(() => {
     const fetchMechanics = async () => {
@@ -125,97 +115,38 @@ function ServiceBookings() {
     }
   };
 
-  const generateTransactionId = () => {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return `TXN-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    }
-
-    return `TXN-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
-  };
-
-  const openPaymentModal = (booking) => {
-    setPaymentTarget(booking);
-    setPaymentMethod("UPI");
-    setPaymentForm({
-      upiId: "",
-      cardNumber: "",
-      cardExpiry: "",
-      cardCvv: "",
-      cardHolderName: "",
-    });
-    setPaymentError("");
-    setPaymentSuccessMessage("");
-    setPaymentModalOpen(true);
-  };
-
-  const closePaymentModal = () => {
-    setPaymentModalOpen(false);
-    setPaymentTarget(null);
-    setPaymentError("");
-    setPaymentProcessing(false);
-  };
-
-  const handlePaymentInputChange = (event) => {
-    setPaymentForm((current) => ({
-      ...current,
-      [event.target.name]: event.target.value,
-    }));
-  };
-
-  const submitServicePayment = async () => {
-    if (!paymentTarget) {
+  const handleProceedToPay = async (booking) => {
+    const amount = Number(booking.actualCost || booking.estimatedCost || 0);
+    if (!amount || amount <= 0) {
+      setPaymentError("Service cost is missing. Update estimated or actual cost before payment.");
       return;
-    }
-
-    if (paymentMethod === "UPI" && !paymentForm.upiId.trim()) {
-      setPaymentError("Enter a valid UPI ID");
-      return;
-    }
-
-    if (paymentMethod === "Credit Card") {
-      const cardDigits = paymentForm.cardNumber.replace(/\s+/g, "");
-      const expiryMatch = /^(0[1-9]|1[0-2])\/\d{2}$/;
-
-      if (cardDigits.length !== 16 || !/^\d{16}$/.test(cardDigits)) {
-        setPaymentError("Enter a valid 16-digit card number");
-        return;
-      }
-
-      if (!expiryMatch.test(paymentForm.cardExpiry.trim())) {
-        setPaymentError("Enter a valid expiry in MM/YY format");
-        return;
-      }
-
-      if (!/^\d{3}$/.test(paymentForm.cardCvv.trim())) {
-        setPaymentError("Enter a valid 3-digit CVV");
-        return;
-      }
-
-      if (!paymentForm.cardHolderName.trim()) {
-        setPaymentError("Enter the card holder name");
-        return;
-      }
     }
 
     try {
-      setPaymentProcessing(true);
+      setProcessingPaymentId(booking._id);
       setPaymentError("");
-      const transactionId = generateTransactionId();
-      const response = await api.put(`/services/bookings/${paymentTarget._id}`, {
-        paymentStatus: "Paid",
-        paymentMethod: paymentMethod,
-        transactionId,
+      const response = await startRazorpayCheckout({
+        endpointBase: "/services/payments",
+        amount,
+        customerName: booking.customerName,
+        customerEmail: booking.customerEmail,
+        bookingId: booking._id,
+        bookingNo: booking.serviceNo || "",
+        branch: booking.branch || "Main Branch",
+        method: "Online",
+        paymentType: "service-booking",
+        customerPhone: booking.customerPhone || "",
+        description: "AutoHub service booking payment",
       });
 
-      closePaymentModal();
-      setPaymentSuccessMessage(
-        `${response.data.message || "Payment completed"}. Transaction ID: ${transactionId}`
-      );
+      setPaymentSuccessMessage(`${response.message || "Payment completed"}. Transaction ID: ${response.booking?.transactionId || ""}`);
+      localStorage.setItem("autohub:payments-updated", String(Date.now()));
+      window.dispatchEvent(new Event("autohub:payments-updated"));
       fetchBookings();
     } catch (error) {
-      setPaymentError(error.response?.data?.message || "Payment update failed");
+      setPaymentError(error.response?.data?.message || error.message || "Payment update failed");
     } finally {
-      setPaymentProcessing(false);
+      setProcessingPaymentId("");
     }
   };
 
@@ -438,8 +369,12 @@ function ServiceBookings() {
                       <td>
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                           {isCustomer && booking.paymentStatus !== "Paid" && booking.actualCost > 0 ? (
-                            <button className="success-btn small-btn" onClick={() => openPaymentModal(booking)}>
-                              Pay Online
+                            <button
+                              className="success-btn small-btn"
+                              onClick={() => handleProceedToPay(booking)}
+                              disabled={processingPaymentId === booking._id}
+                            >
+                              {processingPaymentId === booking._id ? "Processing..." : "Proceed to Pay"}
                             </button>
                           ) : null}
 
@@ -547,127 +482,6 @@ function ServiceBookings() {
               </button>
               <button type="button" className="success-btn small-btn" onClick={submitAssignment}>
                 Save
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {paymentModalOpen && paymentTarget ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(6, 16, 30, 0.62)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 60,
-            padding: "16px",
-          }}
-          onClick={closePaymentModal}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: "560px",
-              backgroundColor: "#fff",
-              borderRadius: "18px",
-              padding: "20px",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
-            }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.12em", color: "#64748b", fontSize: "12px" }}>
-              Razorpay-style checkout
-            </p>
-            <h3 style={{ marginTop: "8px", marginBottom: "6px" }}>Secure payment gateway</h3>
-            <p style={{ marginTop: 0, color: "#475569" }}>
-              {paymentTarget.serviceNo || paymentTarget._id?.slice(-6)} • ₹{Number(paymentTarget.actualCost || 0).toLocaleString("en-IN")}
-            </p>
-
-            <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("UPI")}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  borderRadius: "12px",
-                  border: paymentMethod === "UPI" ? "1px solid #0f766e" : "1px solid #d0d5dd",
-                  background: paymentMethod === "UPI" ? "rgba(15, 118, 110, 0.08)" : "#fff",
-                  fontWeight: 600,
-                }}
-              >
-                UPI
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("Credit Card")}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  borderRadius: "12px",
-                  border: paymentMethod === "Credit Card" ? "1px solid #0f766e" : "1px solid #d0d5dd",
-                  background: paymentMethod === "Credit Card" ? "rgba(15, 118, 110, 0.08)" : "#fff",
-                  fontWeight: 600,
-                }}
-              >
-                Credit Card
-              </button>
-            </div>
-
-            {paymentMethod === "UPI" ? (
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>UPI ID</label>
-                <input
-                  type="text"
-                  name="upiId"
-                  value={paymentForm.upiId}
-                  onChange={handlePaymentInputChange}
-                  placeholder="name@bank"
-                />
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", marginBottom: "12px" }}>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>Card Holder Name</label>
-                  <input type="text" name="cardHolderName" value={paymentForm.cardHolderName} onChange={handlePaymentInputChange} />
-                </div>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>Card Number</label>
-                  <input
-                    type="text"
-                    name="cardNumber"
-                    value={paymentForm.cardNumber}
-                    onChange={handlePaymentInputChange}
-                    placeholder="1234 5678 9012 3456"
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>Expiry</label>
-                  <input type="text" name="cardExpiry" value={paymentForm.cardExpiry} onChange={handlePaymentInputChange} placeholder="MM/YY" />
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>CVV</label>
-                  <input type="password" name="cardCvv" value={paymentForm.cardCvv} onChange={handlePaymentInputChange} maxLength="3" placeholder="***" />
-                </div>
-                <div style={{ gridColumn: "1 / -1", borderRadius: "10px", padding: "10px", backgroundColor: "#eff6ff", color: "#1d4ed8", fontSize: "13px" }}>
-                  Dummy checkout only. Card inputs are used to simulate secure payment.
-                </div>
-              </div>
-            )}
-
-            {paymentError ? (
-              <div style={{ marginBottom: "12px", color: "#b42318", fontSize: "14px" }}>{paymentError}</div>
-            ) : null}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-              <button type="button" className="ghost-btn small-btn" onClick={closePaymentModal}>
-                Cancel
-              </button>
-              <button type="button" className="success-btn small-btn" onClick={submitServicePayment} disabled={paymentProcessing}>
-                {paymentProcessing ? "Processing..." : "Pay Securely"}
               </button>
             </div>
           </div>

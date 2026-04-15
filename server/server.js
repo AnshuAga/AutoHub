@@ -16,6 +16,8 @@ dotenv.config({ path: path.resolve(__dirname, ".env") });
 const requiredEnvVars = [
   "MONGO_URI",
   "JWT_SECRET",
+  "RAZORPAY_KEY_ID",
+  "RAZORPAY_KEY_SECRET",
   "SMTP_HOST",
   "SMTP_PORT",
   "SMTP_USER",

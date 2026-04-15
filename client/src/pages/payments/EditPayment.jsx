@@ -11,7 +11,7 @@ function EditPayment() {
   const [formData, setFormData] = useState({
     customerName: "",
     amount: "",
-    method: "Debit Card",
+    method: "Online",
     cardLast4: "",
     transactionId: "",
     branch: "Main Branch",
@@ -33,7 +33,7 @@ function EditPayment() {
       setFormData({
         customerName: payment.customerName || "",
         amount: payment.amount || "",
-        method: payment.method || "Debit Card",
+        method: payment.method || "Online",
         cardLast4: payment.cardLast4 || "",
         transactionId: payment.transactionId || "",
         branch: payment.branch || "Main Branch",
@@ -89,6 +89,9 @@ function EditPayment() {
             <div style={{ marginBottom: "15px" }}>
               <label>Method</label>
               <select name="method" value={formData.method} onChange={handleChange}>
+                <option value="Online">Online</option>
+                <option value="UPI">UPI</option>
+                <option value="Credit Card">Credit Card</option>
                 <option value="Debit Card">Debit Card</option>
                 <option value="Cash">Cash</option>
                 <option value="Bank Transfer">Bank Transfer</option>

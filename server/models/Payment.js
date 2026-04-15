@@ -50,6 +50,30 @@ const paymentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    gatewayOrderId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    gatewayPaymentId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    gatewaySignature: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    gatewayName: {
+      type: String,
+      default: "Razorpay",
+      trim: true,
+    },
+
     branch: {
       type: String,
       default: "Main Branch",

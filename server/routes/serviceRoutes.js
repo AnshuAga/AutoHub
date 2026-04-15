@@ -8,6 +8,8 @@ const {
   updateServiceCategory,
   deleteServiceCategory,
   getServiceMechanics,
+  createServiceRazorpayOrder,
+  verifyServiceRazorpayPayment,
   addServiceBooking,
   getServiceBookings,
   getServiceBookingById,
@@ -22,6 +24,9 @@ router.put("/categories/:id", protect, updateServiceCategory);
 router.delete("/categories/:id", protect, deleteServiceCategory);
 
 router.get("/mechanics", protect, getServiceMechanics);
+
+router.post("/payments/razorpay/order", protect, createServiceRazorpayOrder);
+router.post("/payments/razorpay/verify", protect, verifyServiceRazorpayPayment);
 
 router.post("/bookings", protect, addServiceBooking);
 router.get("/bookings", protect, getServiceBookings);

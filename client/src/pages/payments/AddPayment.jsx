@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/Sidebar";
 import Footer from "../../components/Footer";
-import { api } from "../../utils/api";
+import { startRazorpayCheckout } from "../../utils/razorpay";
 
 function AddPayment() {
   const navigate = useNavigate();
@@ -48,14 +48,6 @@ function AddPayment() {
     }
   }, []);
 
-  const generateTransactionId = () => {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return `TXN-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    }
-
-    return `TXN-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
-  };
-
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -75,55 +67,23 @@ function AddPayment() {
       return;
     }
 
-    if (selectedMethod === "UPI" && !formData.upiId.trim()) {
-      alert("Enter a valid UPI ID");
-      return;
-    }
-
-    if (selectedMethod === "Credit Card") {
-      const cardDigits = formData.cardNumber.replace(/\s+/g, "");
-      const expiryMatch = /^(0[1-9]|1[0-2])\/\d{2}$/;
-
-      if (cardDigits.length !== 16 || !/^\d{16}$/.test(cardDigits)) {
-        alert("Enter a valid 16-digit card number");
-        return;
-      }
-
-      if (!expiryMatch.test(formData.cardExpiry.trim())) {
-        alert("Enter a valid expiry in MM/YY format");
-        return;
-      }
-
-      if (!/^\d{3}$/.test(formData.cardCvv.trim())) {
-        alert("Enter a valid 3-digit CVV");
-        return;
-      }
-
-      if (!formData.cardHolderName.trim()) {
-        alert("Enter the card holder name");
-        return;
-      }
-    }
-
-    const transactionId = generateTransactionId();
-    const selectedCardDigits = formData.cardNumber.replace(/\s+/g, "");
-    const payload = {
-      bookingId: formData.bookingId || undefined,
-      customerName: formData.customerName.trim(),
-      customerEmail: formData.customerEmail.trim(),
-      amount: Number(formData.amount),
-      method: selectedMethod,
-      cardLast4: selectedMethod === "Credit Card" ? selectedCardDigits.slice(-4) : "",
-      transactionId,
-      branch: formData.branch || "Main Branch",
-      status: "Completed",
-    };
-
     try {
       setProcessing(true);
-      const response = await api.post("/payments", payload);
+      const response = await startRazorpayCheckout({
+        endpointBase: "/payments",
+        amount: Number(formData.amount),
+        customerName: formData.customerName.trim(),
+        customerEmail: formData.customerEmail.trim(),
+        bookingId: formData.bookingId || undefined,
+        bookingNo: formData.bookingNo || "",
+        branch: formData.branch || "Main Branch",
+        method: selectedMethod,
+        paymentType: "booking",
+        customerPhone: "",
+        description: "AutoHub vehicle booking payment",
+      });
 
-      alert(`${response.data.message}. Transaction ID: ${response.data.payment?.transactionId || transactionId}`);
+      alert(`${response.message || "Payment completed"}. Transaction ID: ${response.payment?.transactionId || ""}`);
 
       localStorage.setItem("autohub:payments-updated", String(Date.now()));
       window.dispatchEvent(new Event("autohub:payments-updated"));
@@ -146,7 +106,7 @@ function AddPayment() {
       localStorage.removeItem("selectedPaymentBooking");
       navigate("/deliveries");
     } catch (error) {
-      console.log(error);
+      alert(error.response?.data?.message || error.message || "Payment failed");
     } finally {
       setProcessing(false);
     }
@@ -267,11 +227,11 @@ function AddPayment() {
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                   <button type="button" onClick={() => handleMethodSelect("UPI")} style={methodButtonStyle(selectedMethod === "UPI")}> 
                     <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "4px" }}>UPI</div>
-                    <div style={{ fontSize: "13px", color: "#475569" }}>Pay from any UPI app with instant confirmation.</div>
+                    <div style={{ fontSize: "13px", color: "#475569" }}>Razorpay opens UPI, card, and net banking options securely.</div>
                   </button>
                   <button type="button" onClick={() => handleMethodSelect("Credit Card")} style={methodButtonStyle(selectedMethod === "Credit Card")}> 
                     <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "4px" }}>Credit Card</div>
-                    <div style={{ fontSize: "13px", color: "#475569" }}>Enter card details for a dummy card checkout flow.</div>
+                    <div style={{ fontSize: "13px", color: "#475569" }}>Secure payment is handled by the Razorpay checkout.</div>
                   </button>
                 </div>
               </div>
@@ -297,6 +257,9 @@ function AddPayment() {
                       ))}
                     </div>
                   </div>
+                  <div style={{ borderRadius: "16px", padding: "14px 16px", backgroundColor: "#ecfeff", color: "#155e75", border: "1px solid rgba(8, 145, 178, 0.16)" }}>
+                    Razorpay handles the secure payment step. UPI, card, and other methods stay inside the gateway.
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "16px" }}>
@@ -317,7 +280,7 @@ function AddPayment() {
                     <input type="password" name="cardCvv" value={formData.cardCvv} onChange={handleChange} maxLength="3" placeholder="***" style={fieldStyle} />
                   </div>
                   <div style={{ gridColumn: "1 / -1", borderRadius: "18px", padding: "16px 18px", backgroundColor: "#eff6ff", color: "#1d4ed8", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
-                    This is a dummy checkout. The card inputs are used only to simulate a Razorpay-style flow.
+                    Razorpay opens a real hosted checkout. Card details are never sent through this form.
                   </div>
                 </div>
               )}
