@@ -51,6 +51,48 @@ const isStaffRole = (req) => ["admin", "manager", "employee"].includes(getUserRo
 const isCustomer = (req) => getUserRole(req) === "customer";
 const normalizeEnvValue = (value) => (typeof value === "string" ? value.trim() : value);
 
+const getStartOfToday = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
+const parseScheduledDate = (value) => {
+  if (value instanceof Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const dateMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) {
+    return new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+  }
+
+  const parsedDate = new Date(normalizedValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+};
+
+const validateScheduledDate = (value) => {
+  const scheduledDate = parseScheduledDate(value);
+
+  if (!scheduledDate) {
+    return { ok: false, status: 400, message: "Invalid scheduled date" };
+  }
+
+  if (scheduledDate < getStartOfToday()) {
+    return { ok: false, status: 400, message: "Scheduled date cannot be in the past" };
+  }
+
+  return { ok: true, scheduledDate };
+};
+
 const getEmailTransporter = () => {
   const SMTP_HOST = normalizeEnvValue(process.env.SMTP_HOST);
   const SMTP_PORT = normalizeEnvValue(process.env.SMTP_PORT);
@@ -704,6 +746,11 @@ const addServiceBooking = async (req, res) => {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
     }
 
+    const scheduledDateValidation = validateScheduledDate(scheduledDate);
+    if (!scheduledDateValidation.ok) {
+      return res.status(scheduledDateValidation.status).json({ message: scheduledDateValidation.message });
+    }
+
     const selectedServicesValidation = await validateSelectedServices(selectedServices);
     if (!selectedServicesValidation.ok) {
       return res.status(selectedServicesValidation.status).json({ message: selectedServicesValidation.message });
@@ -727,7 +774,7 @@ const addServiceBooking = async (req, res) => {
       vehicleNumber,
       branch: scopedBranch,
       selectedServices: selectedServicesValidation.selectedServices,
-      scheduledDate,
+      scheduledDate: scheduledDateValidation.scheduledDate,
       scheduledTime,
       issueDescription,
       assignedMechanicId: null,
@@ -925,6 +972,15 @@ const updateServiceBooking = async (req, res) => {
 
     if (typeof updates.customerPhone !== "undefined") {
       updates.customerPhone = normalizePhone(updates.customerPhone);
+    }
+
+    if (updates.scheduledDate !== undefined) {
+      const scheduledDateValidation = validateScheduledDate(updates.scheduledDate);
+      if (!scheduledDateValidation.ok) {
+        return res.status(scheduledDateValidation.status).json({ message: scheduledDateValidation.message });
+      }
+
+      updates.scheduledDate = scheduledDateValidation.scheduledDate;
     }
 
     if (!isStaffRole(req)) {

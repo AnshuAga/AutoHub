@@ -75,6 +75,12 @@ function BranchDetails() {
           totalVehicles: 0,
           availableStock: 0,
           incomingStock: 0,
+          totalEmployees: 0,
+          managerCount: 0,
+          nonManagerEmployees: 0,
+          totalEmployees: 0,
+          managerCount: 0,
+          nonManagerEmployees: 0,
           address: "",
           location: getDefaultBranchLocation(branchName),
           contactPhone: "",
@@ -117,6 +123,11 @@ function BranchDetails() {
 
   useEffect(() => {
     const fetchEmployees = async () => {
+      if (!isAdmin) {
+        setEmployees([]);
+        return;
+      }
+
       try {
         const response = await api.get("/employees");
         setEmployees(response.data || []);
@@ -126,7 +137,7 @@ function BranchDetails() {
     };
 
     fetchEmployees();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!selectedBranch) {
@@ -200,53 +211,12 @@ function BranchDetails() {
     );
   }, [branches]);
 
-  const branchManagerLookup = useMemo(() => {
-    return employees.reduce((accumulator, employee) => {
-      const key = branchKey(employee.branch || "Main Branch");
-      if (!accumulator[key]) {
-        accumulator[key] = [];
-      }
-      accumulator[key].push(employee);
-      return accumulator;
-    }, {});
-  }, [employees]);
-
   const getResolvedManagerDisplay = (branch) => {
-    if (branch?.managerName) {
-      return branch.managerName;
-    }
-
-    const employeesInBranch = branchManagerLookup[branchKey(branch?.branchName)] || [];
-    const branchManager = employeesInBranch.find(
-      (employee) => String(employee.designation || "").toLowerCase() === "branch manager"
-    );
-
-    if (branchManager?.name) {
-      return branchManager.name;
-    }
-
-    return "-";
+    return branch?.managerName || "-";
   };
 
   const getResolvedEmailDisplay = (branch) => {
-    if (branch?.contactEmail) {
-      return branch.contactEmail;
-    }
-
-    const employeesInBranch = branchManagerLookup[branchKey(branch?.branchName)] || [];
-
-    const mappedManager = employeesInBranch.find(
-      (employee) => String(employee._id) === String(branch?.managerEmployeeId || "")
-    );
-    if (mappedManager?.email) {
-      return mappedManager.email;
-    }
-
-    const branchManager = employeesInBranch.find(
-      (employee) => String(employee.designation || "").toLowerCase() === "branch manager"
-    );
-
-    return branchManager?.email || "-";
+    return branch?.contactEmail || "-";
   };
 
   const handleSave = async (event) => {
@@ -311,6 +281,7 @@ function BranchDetails() {
                       <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Manager</th>
                       <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Email</th>
                       <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Vehicles</th>
+                      <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Employees</th>
                       <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Available</th>
                       <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>Incoming</th>
                     </tr>
@@ -323,6 +294,10 @@ function BranchDetails() {
                         <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>{getResolvedManagerDisplay(branch)}</td>
                         <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>{getResolvedEmailDisplay(branch)}</td>
                         <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>{branch.totalVehicles}</td>
+                        <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>
+                          {Number(branch.totalEmployees || 0)}
+                          {Number(branch.managerCount || 0) > 0 ? ` (${branch.managerCount} manager)` : ""}
+                        </td>
                         <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>{branch.availableStock}</td>
                         <td style={{ padding: "10px", borderBottom: "1px solid #f1f5f9" }}>{branch.incomingStock}</td>
                       </tr>

@@ -730,6 +730,120 @@ const teamLoginWithOtp = async (req, res) => {
   }
 };
 
+const listAllUserEmails = async (req, res) => {
+  try {
+    const users = await User.find({ isRegistrationCompleted: true })
+      .select("email role isEmailVerified createdAt")
+      .sort({ email: 1 });
+
+    return res.status(200).json({
+      count: users.length,
+      users: users.map((user) => ({
+        email: user.email,
+        role: user.role,
+        isEmailVerified: Boolean(user.isEmailVerified),
+        createdAt: user.createdAt,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const forcePasswordResetForUsers = async (req, res) => {
+  try {
+    const { allUsers = false, emails = [], userIds = [], sendEmail = true, confirmation } = req.body || {};
+
+    if (allUsers && confirmation !== "RESET_ALL_USERS") {
+      return res.status(400).json({
+        message: "For all-users reset, pass confirmation='RESET_ALL_USERS'",
+      });
+    }
+
+    if (!allUsers && !Array.isArray(emails) && !Array.isArray(userIds)) {
+      return res.status(400).json({
+        message: "Provide allUsers=true or at least one of emails[] / userIds[]",
+      });
+    }
+
+    const normalizedEmails = Array.isArray(emails)
+      ? emails.map((email) => normalizeEmail(email)).filter(Boolean)
+      : [];
+    const normalizedUserIds = Array.isArray(userIds)
+      ? userIds.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+
+    if (!allUsers && normalizedEmails.length === 0 && normalizedUserIds.length === 0) {
+      return res.status(400).json({
+        message: "Provide allUsers=true or at least one target in emails[] / userIds[]",
+      });
+    }
+
+    const query = { isRegistrationCompleted: true };
+    if (!allUsers) {
+      query.$or = [];
+      if (normalizedEmails.length > 0) {
+        query.$or.push({ email: { $in: normalizedEmails } });
+      }
+      if (normalizedUserIds.length > 0) {
+        query.$or.push({ _id: { $in: normalizedUserIds } });
+      }
+    }
+
+    const users = await User.find(query).select("_id name email isEmailVerified");
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "No matching users found" });
+    }
+
+    let resetUpdatedCount = 0;
+    let resetEmailSentCount = 0;
+    let resetEmailSkippedCount = 0;
+    const resetEmailFailed = [];
+
+    for (const user of users) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const hashedResetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+      user.resetPasswordToken = hashedResetToken;
+      user.resetPasswordExpiresAt = new Date(Date.now() + RESET_PASSWORD_EXPIRY_MINUTES * 60 * 1000);
+      user.loginOtp = "";
+      user.loginOtpExpiresAt = null;
+      user.registerOtp = "";
+      user.registerOtpExpiresAt = null;
+      await user.save();
+      resetUpdatedCount += 1;
+
+      if (sendEmail && user.isEmailVerified) {
+        try {
+          const resetUrl = buildPasswordResetLink(resetToken);
+          await sendPasswordResetEmail({
+            to: user.email,
+            name: user.name,
+            resetUrl,
+          });
+          resetEmailSentCount += 1;
+        } catch {
+          resetEmailFailed.push(user.email);
+        }
+      } else {
+        resetEmailSkippedCount += 1;
+      }
+    }
+
+    return res.status(200).json({
+      message: "Password reset enforced successfully",
+      resetUpdatedCount,
+      resetEmailSentCount,
+      resetEmailSkippedCount,
+      resetEmailFailedCount: resetEmailFailed.length,
+      resetEmailFailed,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 const googleAuthStart = async (req, res) => {
   try {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_REDIRECT_URI) {
@@ -936,6 +1050,8 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPassword,
+  listAllUserEmails,
+  forcePasswordResetForUsers,
   googleAuthStart,
   googleAuthCallback,
   facebookAuthStart,

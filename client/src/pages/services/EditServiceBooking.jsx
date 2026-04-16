@@ -5,6 +5,15 @@ import Sidebar from "../../components/Sidebar";
 import Footer from "../../components/Footer";
 import { api } from "../../utils/api";
 
+const getTodayDateInputValue = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 function EditServiceBooking() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -79,6 +88,11 @@ function EditServiceBooking() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (formData.scheduledDate && formData.scheduledDate < getTodayDateInputValue()) {
+      alert("Scheduled date cannot be in the past");
+      return;
+    }
 
     try {
       const payload = isCustomer
@@ -176,7 +190,13 @@ function EditServiceBooking() {
 
             <div style={{ marginBottom: "15px" }}>
               <label>Preferred Date</label>
-              <input type="date" name="scheduledDate" value={formData.scheduledDate} onChange={handleChange} />
+              <input
+                type="date"
+                name="scheduledDate"
+                value={formData.scheduledDate}
+                onChange={handleChange}
+                min={getTodayDateInputValue()}
+              />
             </div>
 
             <div style={{ marginBottom: "15px" }}>

@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 
 const TEAM_SCOPED_ROLES = ["manager", "employee"];
+const normalizeRole = (value) => String(value || "").toLowerCase();
 
 const protect = async (req, res, next) => {
   try {
@@ -20,7 +21,7 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: "Not authorized, user not found" });
     }
 
-    const userRole = String(user.role || "").toLowerCase();
+    const userRole = normalizeRole(user.role);
     if (TEAM_SCOPED_ROLES.includes(userRole)) {
       const linkedEmployee = await Employee.findOne({
         $or: [
@@ -64,4 +65,21 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+const authorizeRoles = (...allowedRoles) => {
+  const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role));
+
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, user missing" });
+    }
+
+    const userRole = normalizeRole(req.user.role);
+    if (!normalizedAllowedRoles.includes(userRole)) {
+      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    }
+
+    next();
+  };
+};
+
+module.exports = { protect, authorizeRoles };

@@ -1,5 +1,6 @@
 const BranchDetail = require("../models/BranchDetail");
 const Vehicle = require("../models/Vehicle");
+const Employee = require("../models/Employee");
 
 const DEFAULT_BRANCHES = ["Main Branch", "Delhi", "Mumbai"];
 
@@ -28,9 +29,10 @@ const getDefaultBranchLocation = (branchName = "") => {
 
 const getBranchDetails = async (req, res) => {
   try {
-    const [details, vehicles] = await Promise.all([
+    const [details, vehicles, employees] = await Promise.all([
       BranchDetail.find({}).sort({ branchName: 1 }),
       Vehicle.find({}).select("showroomBranch stock incomingStock"),
+      Employee.find({}).select("_id name email designation branch"),
     ]);
 
     const detailByBranch = mapDetailsByBranch(details);
@@ -54,8 +56,33 @@ const getBranchDetails = async (req, res) => {
       return accumulator;
     }, {});
 
+    const employeeStatsByBranch = employees.reduce((accumulator, employee) => {
+      const branchName = String(employee.branch || "Main Branch").trim() || "Main Branch";
+      const key = toBranchKey(branchName);
+
+      if (!accumulator[key]) {
+        accumulator[key] = {
+          branchName,
+          totalEmployees: 0,
+          managerCount: 0,
+          managerCandidates: [],
+        };
+      }
+
+      accumulator[key].totalEmployees += 1;
+
+      if (String(employee.designation || "").toLowerCase() === "branch manager") {
+        accumulator[key].managerCount += 1;
+        accumulator[key].managerCandidates.push(employee);
+      }
+
+      return accumulator;
+    }, {});
+
     const defaultBranchKeys = DEFAULT_BRANCHES.map((branchName) => toBranchKey(branchName));
-    const allBranchKeys = [...new Set([...defaultBranchKeys, ...Object.keys(statsByBranch), ...Object.keys(detailByBranch)])];
+    const allBranchKeys = [
+      ...new Set([...defaultBranchKeys, ...Object.keys(statsByBranch), ...Object.keys(detailByBranch), ...Object.keys(employeeStatsByBranch)]),
+    ];
 
     const response = allBranchKeys
       .map((key) => {
@@ -70,6 +97,18 @@ const getBranchDetails = async (req, res) => {
         };
 
         const detail = detailByBranch[key];
+        const employeeStats = employeeStatsByBranch[key] || {
+          totalEmployees: 0,
+          managerCount: 0,
+          managerCandidates: [],
+        };
+
+        const mappedManager = detail?.managerEmployeeId
+          ? employeeStats.managerCandidates.find(
+              (employee) => String(employee._id) === String(detail.managerEmployeeId)
+            )
+          : null;
+        const branchManager = mappedManager || employeeStats.managerCandidates[0] || null;
 
         return {
           _id: detail?._id || null,
@@ -80,9 +119,12 @@ const getBranchDetails = async (req, res) => {
           address: detail?.address || "",
           location: detail?.location || getDefaultBranchLocation(stats.branchName),
           contactPhone: detail?.contactPhone || "",
-          contactEmail: detail?.contactEmail || "",
-          managerName: detail?.managerName || "",
-          managerEmployeeId: detail?.managerEmployeeId || null,
+          contactEmail: detail?.contactEmail || branchManager?.email || "",
+          managerName: detail?.managerName || branchManager?.name || "",
+          managerEmployeeId: detail?.managerEmployeeId || branchManager?._id || null,
+          totalEmployees: Number(employeeStats.totalEmployees || 0),
+          managerCount: Number(employeeStats.managerCount || 0),
+          nonManagerEmployees: Math.max(0, Number(employeeStats.totalEmployees || 0) - Number(employeeStats.managerCount || 0)),
           notes: detail?.notes || "",
           updatedAt: detail?.updatedAt || null,
         };

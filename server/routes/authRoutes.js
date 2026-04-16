@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
+const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 
 const {
   sendRegisterOtp,
@@ -16,6 +16,8 @@ const {
   changePassword,
   forgotPassword,
   resetPassword,
+  listAllUserEmails,
+  forcePasswordResetForUsers,
   googleAuthStart,
   googleAuthCallback,
   facebookAuthStart,
@@ -35,6 +37,8 @@ router.post("/reset-password", resetPassword);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);
 router.put("/change-password", protect, changePassword);
+router.get("/admin/users/emails", protect, authorizeRoles("admin"), listAllUserEmails);
+router.post("/admin/users/force-password-reset", protect, authorizeRoles("admin"), forcePasswordResetForUsers);
 router.get("/google/start", googleAuthStart);
 router.get("/google/callback", googleAuthCallback);
 router.get("/facebook/start", facebookAuthStart);

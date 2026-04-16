@@ -37,6 +37,7 @@ const buildPaymentFilters = (query = {}) => {
     const regex = new RegExp(escapeRegex(q), "i");
     filters.$or = [
       { customerName: regex },
+      { bookingNo: regex },
       { transactionId: regex },
       { cardLast4: regex },
     ];
@@ -419,9 +420,14 @@ const getPayments = async (req, res) => {
         bookingNo: paymentData.bookingNo || populatedBookingNo || "",
       };
 
+      const resolvedBookingId =
+        normalizedPayment.bookingId && typeof normalizedPayment.bookingId === "object"
+          ? String(normalizedPayment.bookingId._id || "")
+          : String(normalizedPayment.bookingId || "");
+
       const dedupeKey =
-        normalizedPayment.bookingId
-          ? `booking-id:${normalizedPayment.bookingId}`
+        resolvedBookingId
+          ? `booking-id:${resolvedBookingId}`
           :
         normalizedPayment.transactionId
           ? `txn:${normalizedPayment.transactionId}`

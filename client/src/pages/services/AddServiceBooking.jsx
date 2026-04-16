@@ -5,6 +5,15 @@ import Footer from "../../components/Footer";
 import { api } from "../../utils/api";
 import { isTenDigitPhoneNumber, normalizePhoneInput } from "../../utils/phone";
 
+const getTodayDateInputValue = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 function AddServiceBooking() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = String(user?.role || "").toLowerCase();
@@ -88,6 +97,11 @@ function AddServiceBooking() {
 
     if (!formData.customerName || !formData.vehicleName || !formData.branch || selectedServices.length === 0 || !formData.scheduledDate) {
       alert("Please fill required fields and select at least one service");
+      return;
+    }
+
+    if (formData.scheduledDate < getTodayDateInputValue()) {
+      alert("Scheduled date cannot be in the past");
       return;
     }
 
@@ -322,7 +336,13 @@ function AddServiceBooking() {
 
             <div style={{ marginBottom: "15px" }}>
               <label>Preferred Date</label>
-              <input type="date" name="scheduledDate" value={formData.scheduledDate} onChange={handleChange} />
+              <input
+                type="date"
+                name="scheduledDate"
+                value={formData.scheduledDate}
+                onChange={handleChange}
+                min={getTodayDateInputValue()}
+              />
             </div>
 
             <div style={{ marginBottom: "15px" }}>
